@@ -1,41 +1,47 @@
-const express = require('express');
-const mongoose = require('mongoose');
-const bodyParser = require('body-parser');
-const cors = require('cors');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
+const express = require("express");
+const mongoose = require("mongoose");
+const bodyParser = require("body-parser");
+const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 const app = express();
 const port = process.env.PORT || 5000;
-const SECRET_KEY = 'your_secret_key';
+const SECRET_KEY = "your_secret_key";
 
 app.use(bodyParser.json());
 app.use(cors());
 
-mongoose.connect('mongodb+srv://Sanjana_Fernando:Sanjana123@cluster0.wrymys8.mongodb.net/CurrencyExchange?retryWrites=true&w=majority&appName=Cluster0', {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-});
+mongoose.connect(
+  "mongodb+srv://Sanjana_Fernando:Sanjana12345@cluster0.wrymys8.mongodb.net/CurrencyExchange?retryWrites=true&w=majority&appName=Cluster0",
+  {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  }
+);
 
 const db = mongoose.connection;
-db.on('error', console.error.bind(console, 'connection error:'));
-db.once('open', () => {
-  console.log('Connected to MongoDB');
+db.on("error", console.error.bind(console, "connection error:"));
+db.once("open", () => {
+  console.log("Connected to MongoDB");
 });
 
 const accountSchema = new mongoose.Schema({
   userId: String,
-  amount: Number, 
+  amount: Number,
   pwd: String,
-  username: String
+  username: String,
 });
 
-const Account = mongoose.model('Account', accountSchema);
+const Account = mongoose.model("Account", accountSchema);
 
 const authenticateJWT = (req, res, next) => {
-  const token = req.header('Authorization') && req.header('Authorization').split(' ')[1];
+  const token =
+    req.header("Authorization") && req.header("Authorization").split(" ")[1];
   if (!token) {
-    return res.status(401).json({ message: 'Access denied, no token provided.' });
+    return res
+      .status(401)
+      .json({ message: "Access denied, no token provided." });
   }
 
   try {
@@ -43,38 +49,42 @@ const authenticateJWT = (req, res, next) => {
     req.user = decoded;
     next();
   } catch (ex) {
-    res.status(400).json({ message: 'Invalid token.' });
+    res.status(400).json({ message: "Invalid token." });
   }
 };
 
-app.post('/login', async (req, res) => {
+app.post("/login", async (req, res) => {
   const { userId, pwd } = req.body;
 
-  console.log('Received login request:', { userId, pwd }); // Debugging log
+  console.log("Received login request:", { userId, pwd }); // Debugging log
 
   try {
     const user = await Account.findOne({ userId });
 
     if (!user) {
-      console.log('Invalid credentials: user not found'); // Debugging log
-      return res.status(401).json({ message: 'Invalid credentials' });
+      console.log("Invalid credentials: user not found"); // Debugging log
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
     const isPasswordValid = await bcrypt.compare(pwd, user.pwd);
     if (!isPasswordValid) {
-      console.log('Invalid credentials: incorrect password'); // Debugging log
-      return res.status(401).json({ message: 'Invalid credentials' });
+      console.log("Invalid credentials: incorrect password"); // Debugging log
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    const token = jwt.sign({ userId: user.userId }, SECRET_KEY, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user.userId }, SECRET_KEY, {
+      expiresIn: "1h",
+    });
 
-    res.status(200).json({ message: 'Login successful', token, userId: user.userId });
+    res
+      .status(200)
+      .json({ message: "Login successful", token, userId: user.userId });
   } catch (error) {
-    console.error('Internal server error:', error); // Debugging log
-    res.status(500).json({ message: 'Internal server error', error });
+    console.error("Internal server error:", error); // Debugging log
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
-app.post('/transfer', authenticateJWT, async (req, res) => {
+app.post("/transfer", authenticateJWT, async (req, res) => {
   const { senderId, recipientId, amount } = req.body;
 
   try {
@@ -82,11 +92,11 @@ app.post('/transfer', authenticateJWT, async (req, res) => {
     const recipient = await Account.findOne({ userId: recipientId });
 
     if (!sender || !recipient) {
-      return res.status(404).json({ message: 'Sender or recipient not found' });
+      return res.status(404).json({ message: "Sender or recipient not found" });
     }
 
     if (sender.amount < amount) {
-      return res.status(400).json({ message: 'Insufficient funds' });
+      return res.status(400).json({ message: "Insufficient funds" });
     }
 
     sender.amount -= amount;
@@ -95,62 +105,68 @@ app.post('/transfer', authenticateJWT, async (req, res) => {
     await sender.save();
     await recipient.save();
 
-    res.status(200).json({ message: `Transferred ${amount} from User ${senderId} to User ${recipientId}` });
+    res
+      .status(200)
+      .json({
+        message: `Transferred ${amount} from User ${senderId} to User ${recipientId}`,
+      });
   } catch (error) {
-    res.status(500).json({ message: 'Internal server error', error });
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
 
-app.put('/signup', async (req, res) => {
+app.put("/signup", async (req, res) => {
   const { userId, username, pwd } = req.body;
 
   if (!userId || !username || !pwd) {
-    return res.status(400).json({ message: 'User ID, username, and password are required' });
+    return res
+      .status(400)
+      .json({ message: "User ID, username, and password are required" });
   }
 
   try {
     const existingUser = await Account.findOne({ userId });
 
     if (existingUser) {
-      return res.status(409).json({ message: 'User ID already exists' });
+      return res.status(409).json({ message: "User ID already exists" });
     }
 
     const hashedPwd = await bcrypt.hash(pwd, 10);
 
     await Account.create({ userId, username, pwd: hashedPwd, amount: 0 });
 
-    res.status(201).json({ message: 'User registered successfully' });
+    res.status(201).json({ message: "User registered successfully" });
   } catch (error) {
-    res.status(500).json({ message: 'Internal server error', error });
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
 
-app.get('/user/:userId', authenticateJWT, async (req, res) => {
+app.get("/user/:userId", authenticateJWT, async (req, res) => {
   const { userId } = req.params;
 
   try {
-    const user = await Account.findOne({ userId }, 'userId amount username');
+    const user = await Account.findOne({ userId }, "userId amount username");
     if (!user) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
 
     res.status(200).json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Internal server error', error });
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
 
-app.delete('/user/:userId', authenticateJWT, async (req, res) => {
+app.delete("/user/:userId", authenticateJWT, async (req, res) => {
   const { userId } = req.params;
 
   try {
     const result = await Account.deleteOne({ userId });
     if (result.deletedCount === 0) {
-      return res.status(404).json({ message: 'User not found' });
+      return res.status(404).json({ message: "User not found" });
     }
-    res.status(200).json({ message: 'User deleted successfully' });
+    res.status(200).json({ message: "User deleted successfully" });
   } catch (error) {
-    res.status(500).json({ message: 'Internal server error', error });
+    res.status(500).json({ message: "Internal server error", error });
   }
 });
 
