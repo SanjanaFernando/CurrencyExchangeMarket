@@ -4,21 +4,19 @@ const bodyParser = require("body-parser");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
+require("dotenv").config();
 
 const app = express();
 const port = process.env.PORT || 5000;
-const SECRET_KEY = "your_secret_key";
+const SECRET_KEY = process.env.JWT_SECRET_KEY || "fallback_secret_key";
 
 app.use(bodyParser.json());
 app.use(cors());
 
-mongoose.connect(
-  "mongodb+srv://Sanjana_Fernando:Sanjana12345@cluster0.wrymys8.mongodb.net/CurrencyExchange?retryWrites=true&w=majority&appName=Cluster0",
-  {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  }
-);
+mongoose.connect(process.env.MONGODB_URI, {
+  useNewUrlParser: true,
+  useUnifiedTopology: true,
+});
 
 const db = mongoose.connection;
 db.on("error", console.error.bind(console, "connection error:"));
@@ -105,11 +103,9 @@ app.post("/transfer", authenticateJWT, async (req, res) => {
     await sender.save();
     await recipient.save();
 
-    res
-      .status(200)
-      .json({
-        message: `Transferred ${amount} from User ${senderId} to User ${recipientId}`,
-      });
+    res.status(200).json({
+      message: `Transferred ${amount} from User ${senderId} to User ${recipientId}`,
+    });
   } catch (error) {
     res.status(500).json({ message: "Internal server error", error });
   }
